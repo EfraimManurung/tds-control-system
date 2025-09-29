@@ -15,7 +15,7 @@
  * -  Added basic, sensors and actuators classes and basic functions of the main
  * app.
  *
- * [01-09-2025]
+ * [25-09-2025]
  *  - First initialization.
  */
 
