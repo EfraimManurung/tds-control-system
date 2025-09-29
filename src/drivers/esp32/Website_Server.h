@@ -26,7 +26,7 @@ public:
    */
   bool init(unsigned int motor_circulation_time_on,
             unsigned int motor_circulation_time_off,
-            bool *motor_circulation_state, unsigned int *tds_set_point);
+            bool *motor_circulation_state, float *tds_set_point);
 
   // Main loop to handle HTTP server events
   void loop();
@@ -54,7 +54,7 @@ private:
   unsigned int _circulation_motor_time_off;
 
   // Pointer to TDS set point (shared with main app)
-  unsigned int *_tds_set_point = nullptr;
+  float *_tds_set_point = nullptr;
 
   // Web handlers for HTTP endpoints
   void handle_root();

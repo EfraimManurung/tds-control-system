@@ -27,7 +27,7 @@ unsigned int Website_Server::get_tds_set_point() const {
 bool Website_Server::init(unsigned int motor_circulation_time_on,
                           unsigned int motor_circulation_time_off,
                           bool *motor_circulation_state,
-                          unsigned int *tds_set_point) {
+                          float *tds_set_point) {
   _circulation_motor_state = motor_circulation_state;
   _circulation_motor_time_on = motor_circulation_time_on;
   _circulation_motor_time_off = motor_circulation_time_off;

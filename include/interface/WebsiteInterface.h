@@ -21,8 +21,7 @@ public:
    */
   virtual bool init(unsigned int motor_circulation_time_on,
                     unsigned int motor_circulation_time_off,
-                    bool *motor_circulation_state,
-                    unsigned int *tds_set_point) = 0;
+                    bool *motor_circulation_state, float *tds_set_point) = 0;
 
   // Main loop to handle HTTP server events
   virtual void loop() = 0;

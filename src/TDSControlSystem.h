@@ -16,6 +16,7 @@
 #include <drivers/esp32/Actuator_Relay.h>
 #include <drivers/esp32/GPIO_ESP32.h>
 #include <drivers/esp32/Sensor_Manager.h>
+#include <drivers/esp32/Sensor_TDS.h>
 
 // ======================
 // L298N Motor Driver #0
@@ -36,9 +37,9 @@
 // Three digital output pins to control relays
 // =======================
 
-#define RELAY_0_PIN 15 // OUTPUT - Relay control
+#define RELAY_0_PIN 17 // OUTPUT - Relay control
 #define RELAY_1_PIN 16 // OUTPUT - Relay control
-#define RELAY_2_PIN 17 // OUTPUT - Relay control
+#define RELAY_2_PIN 15 // OUTPUT - Relay control
 
 // =======================
 // === RGB LED ===
@@ -55,6 +56,13 @@
 #define OLED_SDA_PIN 21 // I2C SDA line - OUTPUT
 #define OLED_SCL_PIN 22 // I2C SCL line - OUTPUT
 
+#define TDS_SENSOR_PIN 35
+
+struct motor_timing {
+  unsigned int time_on;
+  unsigned int time_off;
+};
+
 class TDSControlSystem {
 
 public:
@@ -67,6 +75,10 @@ public:
 
   /* for now it is only for elapsed time */
   bool update_sensor_data();
+
+  void website_task(void *parameter);
+  void circulation_motor_task(void *parameter);
+  void update_circulation_motor_on_off_time();
 
 private:
   WebsiteInterface &_web;
@@ -83,8 +95,24 @@ private:
 
   // time on and off for
   unsigned int _circulation_motor_time_on = 60000;
-  unsigned int _circulation_motor_time_off = 30000;
+  unsigned int _circulation_motor_time_off = 15000;
 
   bool _motor_circulation_state = false;
-  unsigned int _tds_set_point = 750;
+  float _tds_set_point = 750.0;
+
+  Actuator_LED _led_on_board{RGB_LED_PIN};
+  GPIO_ESP32 _gpio_esp32;
+
+  Actuator_Relay _circulation_motor{RELAY_0_PIN};
+  Actuator_L298N _dosing_motor{&_gpio_esp32, ENA_MOTOR_0_PIN, IN1_MOTOR_0_PIN,
+                               IN2_MOTOR_0_PIN};
+
+  bool _circulation_motor_states = false;
+  motor_timing _circulation_motor_timings;
+  unsigned long _last_circulation_motor_toggle;
+
+  /* sensor */
+  Sensor_TDS _tds_sensor{TDS_SENSOR_PIN};
+
+  float _current_tds_value = 0.0;
 };
