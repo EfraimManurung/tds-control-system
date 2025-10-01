@@ -120,4 +120,15 @@ private:
   float _current_tds_value = 0.0;
 
   /* ISR */
+  ISR_CircularBuffer<int, 8> _ISR_cb;  // global buffer
+  hw_timer_t *_ISR_hw_timer = nullptr; // timer handle
+  volatile int _ISR_counter = 0;
+
+  /* static singleton pointer */
+  static TDSControlSystem *instance;
+
+  static void IRAM_ATTR _ISR_on_timer_wrapper(); // trampoline for ISR
+  void IRAM_ATTR _ISR_on_timer();                // actual ISR
+public:
+  void _ISR_consumer_task(void *pvParams); // constumer task
 };

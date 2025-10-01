@@ -7,6 +7,10 @@
  *
  * Changelog:
  *
+ * [01-10-2025]
+ * - Added and implemented circular buffer in the main apps and TDSControlSystem
+ * class.
+ *
  * [29-09-2025]
  * - Added circular buffer example, TDS sensor, and refactored some code and
  * control flow.
@@ -19,11 +23,14 @@
  *  - First initialization.
  */
 
+#include "TDSControlSystem.h"
 #include <Arduino.h>
 
-#include "TDSControlSystem.h"
+/* === Drivers === */
 #include <drivers/esp32/Actuator_Manager.h>
 #include <drivers/esp32/Display_SSD1306.h>
+#include <drivers/esp32/Sensor_Manager.h>
+#include <drivers/esp32/Website_Server.h>
 
 #ifdef USE_LOCAL_WIFI
 #include <drivers/esp32/Local_WiFi.h>
@@ -31,60 +38,68 @@
 #include <drivers/esp32/Network_WiFi.h>
 #endif
 
-#include <drivers/esp32/Sensor_Manager.h>
-#include <drivers/esp32/Website_Server.h>
-
-// === Module Declarations ===
-Actuator_Manager act_mgr; // Manages all actuators (LED, Motors, Relays)
+/* === Global Managers === */
+Actuator_Manager act_mgr; // Centralized actuator manager (LEDs, motors, relays)
 Display_SSD1306 ssd1306;  // OLED display driver
-Sensor_Manager
-    sens_mgr; // Manages all sensors (keypads, buttons, water level, etc)
+Sensor_Manager sens_mgr;  // Centralized sensor manager (TDS, buttons, etc.)
 
-// === WiFi Configuration ===
+/* === WiFi Configuration === */
 #ifdef USE_LOCAL_WIFI
-#define DEFAULT_SSID "PLASMART-Access-Point"
-#define DEFAULT_PASS "plasmart1123"
-
+#define DEFAULT_SSID "TDS-System-Access-Point"
+#define DEFAULT_PASS "tdscontrol1123"
 Local_WiFi wifi;
 #else
 #define DEFAULT_SSID "Manurung_1"
 #define DEFAULT_PASS "zephan23"
-
-Network_WiFi wifi; // WiFi connectivity manager
+Network_WiFi wifi; // Default: STA mode WiFi manager
 #endif
 
-Website_Server web; // Web interface for configuration and monitoring
+/* === Web Interface === */
+Website_Server web; // HTTP server for monitoring/configuration
 
-// === Core System Instance ===
+/* === Core Control System === */
 TDSControlSystem tds_cs(web, ssd1306, wifi, sens_mgr, act_mgr, DEFAULT_SSID,
                         DEFAULT_PASS);
 
-// === Task Trampolines ===
-// These allow passing class methods to C-style FreeRTOS tasks.
+/* === FreeRTOS Task Trampolines ===
+   FreeRTOS requires C-style function pointers,
+   so these wrappers forward to class methods. */
 void website_task_trampoline(void *param) { tds_cs.website_task(param); }
-
-void circulation_motor_task_trampolin(void *param) {
+void circulation_motor_task_trampoline(void *param) {
   tds_cs.circulation_motor_task(param);
 }
-
-void setup() {
-  Serial.begin(115200);
-
-  tds_cs.init();
-
-  // Web server handler (LOW priority, runs on core 0)
-  xTaskCreatePinnedToCore(website_task_trampoline, // function
-                          "WebTask",               // name
-                          4096,                    // stack size
-                          NULL,                    // param
-                          2,                       // priority
-                          NULL,                    // handle
-                          0                        // core
-  );
-
-  // Plasma relay toggling (MEDIUM priority, core 1)
-  xTaskCreatePinnedToCore(circulation_motor_task_trampolin,
-                          "CirculationMotorTask", 4096, NULL, 2, NULL, 1);
+void ISR_consumer_task_trampoline(void *param) {
+  tds_cs._ISR_consumer_task(param);
 }
 
+/* === Arduino Setup === */
+void setup() {
+  Serial.begin(115200);
+  Serial.println("\n[TDSControlSystem] Booting system...");
+
+  // Initialize core control system (network, sensors, actuators, ISR timer)
+  if (!tds_cs.init()) {
+    Serial.println("[TDS] Initialization failed. Halting.");
+    while (true) {
+      delay(1000);
+    } // fail-safe lockup
+  }
+
+  /* Spawn RTOS tasks with appropriate priorities and core affinity */
+
+  // Web server handler (low priority → non-time-critical, core 0)
+  xTaskCreatePinnedToCore(website_task_trampoline, "WebTask", 4096, nullptr, 2,
+                          nullptr, 0);
+
+  // Circulation motor relay control (medium priority, core 1)
+  xTaskCreatePinnedToCore(circulation_motor_task_trampoline,
+                          "CirculationMotorTask", 4096, nullptr, 2, nullptr, 1);
+
+  // ISR consumer task (high priority, core 1)
+  xTaskCreatePinnedToCore(ISR_consumer_task_trampoline, "ConsumerTask", 4096,
+                          nullptr, 3, nullptr, 1);
+}
+
+/* === Arduino Loop ===
+   Kept lightweight: only periodic sensor updates. */
 void loop() { tds_cs.update_sensor_data(); }

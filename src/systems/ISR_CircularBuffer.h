@@ -16,55 +16,68 @@
 #include <array>
 
 // Event group bits
-#define EVENT_BIT_DATA_AVAILABLE (1 << 0)
-#define EVENT_BIT_BUFFER_FULL (1 << 1)
+#define EVENT_BIT_SENSOR_AVAILABLE (1 << 0)
+#define EVENT_BIT_DATA_AVAILABLE (1 << 1)
+#define EVENT_BIT_BUFFER_FULL (1 << 2)
 
 /* Information:
     - T: generic data type (int, float, struct, etc).
     - N: compile-time buffer capacity.
     - This makes the class type-safe and size-safe at compile time (no malloc).
 */
+// --- File: ISR_CircularBuffer.h (replace the template methods with this safer
+// version) ---
 template <typename T, size_t N> struct ISR_CircularBuffer {
   std::array<T, N> arr;
-  std::size_t write_idx = 0; // Index of the next element to write (push)
-  std::size_t read_idx = 0;  // Index of the next element to read (pop)
-  std::size_t count = 0;     // Number of elements in the buffer
+  std::size_t write_idx = 0;
+  std::size_t read_idx = 0;
+  std::size_t count = 0;
 
   portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
   EventGroupHandle_t event_group;
 
-  /* constructor */
   ISR_CircularBuffer() { event_group = xEventGroupCreate(); }
 
+  // ISR-safe push
   void push_isr(const T &t) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    // perform buffer update inside the critical section
     portENTER_CRITICAL_ISR(&mux);
-    arr.at(write_idx) = t;
+    arr[write_idx] = t; // use operator[] (no exceptions)
     write_idx = (write_idx + 1) % N;
     if (count < N) {
-      count++;
+      ++count;
     } else {
-      /* buffer is full, move forward read_idx */
-      read_idx = (read_idx + 1)
+      // buffer full -> overwrite oldest, advance read_idx
+      read_idx = (read_idx + 1) % N;
     }
     portEXIT_CRITICAL_ISR(&mux);
 
-    xEventGroupSetBitsFromISR(event_group, EVENT_BIT_DATA_AVAILABLE, nullptr);
+    // notify consumer task; capture wake info so a context switch can occur
+    xEventGroupSetBitsFromISR(event_group, EVENT_BIT_DATA_AVAILABLE,
+                              &xHigherPriorityTaskWoken);
 
     if (count == N) {
-      xEventGroupSetBitsFromISR(event_group, EVENT_BIT_BUFFER_FULL, nullptr);
+      xEventGroupSetBitsFromISR(event_group, EVENT_BIT_BUFFER_FULL,
+                                &xHigherPriorityTaskWoken);
     }
+
+    // yield to higher priority task if needed
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
 
+  // Task-safe pop: perform check+pop inside critical to avoid races
   T pop() {
+    portENTER_CRITICAL(&mux);
     if (count == 0) {
-      // Buffer is empty, return a default-constructed T.
-      return T{};
+      portEXIT_CRITICAL(&mux);
+      return T{}; // empty
     }
-    portENTER_CRITICAL_ISR(&mux);
-    T value = arr.at(read_idx);
+    T value = arr[read_idx];
     read_idx = (read_idx + 1) % N;
     --count;
-    portEXIT_CRITICAL_ISR(&mux);
+    portEXIT_CRITICAL(&mux);
     return value;
   }
 
