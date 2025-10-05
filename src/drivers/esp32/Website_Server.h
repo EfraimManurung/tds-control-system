@@ -22,11 +22,14 @@ public:
    * state
    * @param tds_set_point               Pointer to TDS set point value (shared
    * with main app)
+   * @param tds_calibration_value       Pointer to TDS calibration value (shared
+   * with main app)
    * @return                            true on success
    */
   bool init(unsigned int motor_circulation_time_on,
             unsigned int motor_circulation_time_off,
-            bool *motor_circulation_state, float *tds_set_point);
+            bool *motor_circulation_state, float *tds_set_point,
+            float *tds_calibration_value);
 
   // Main loop to handle HTTP server events
   void loop();
@@ -43,6 +46,8 @@ public:
   // Getter for TDS set point
   unsigned int get_tds_set_point() const;
 
+  unsigned int get_tds_calibration_value() const;
+
 private:
   WebServer _server{80}; // Web server on port 80
 
@@ -55,6 +60,7 @@ private:
 
   // Pointer to TDS set point (shared with main app)
   float *_tds_set_point = nullptr;
+  float *_tds_calibration_value = nullptr;
 
   // Web handlers for HTTP endpoints
   void handle_root();

@@ -97,11 +97,28 @@ private:
   unsigned long _start_millis;
 
   // time on and off for
-  unsigned int _circulation_motor_time_on = 60000;
-  unsigned int _circulation_motor_time_off = 15000;
+  unsigned int _circulation_motor_time_on = 150000;
+  unsigned int _circulation_motor_time_off = 150000;
 
   bool _motor_circulation_state = false;
   float _tds_set_point = 750.0;
+  /**
+   * based on TDS caliration buffer solution, with a TDS value of 500 ppm.
+   *
+   * Sample(s):
+   *  - TDS sensor - TDS calibration buffer solution
+   *  1. 715 - 500 = 215 ppm (offset)
+   *  2. 710 - 500 = 210 ppm (offset)
+   *  3. 706 - 500 = 206 ppm (offset)
+   *
+   * Sample with other TDS meters
+   *  1. 780 - 531 = 249 ppm (offset)
+   *
+   * So the default offset is averaged values from above, and it is 880 / 4 =
+   * 220 ppm
+   *
+   *  */
+  float _tds_calibration_value = 220.0;
 
   Actuator_LED _led_on_board{RGB_LED_PIN};
   GPIO_ESP32 _gpio_esp32;
@@ -130,5 +147,5 @@ private:
   static void IRAM_ATTR _ISR_on_timer_wrapper(); // trampoline for ISR
   void IRAM_ATTR _ISR_on_timer();                // actual ISR
 public:
-  void _ISR_consumer_task(void *pvParams); // constumer task
+  void display_task(void *pvParams); // constumer task - display task
 };

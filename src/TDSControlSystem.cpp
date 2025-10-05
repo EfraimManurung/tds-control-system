@@ -53,7 +53,8 @@ bool TDSControlSystem::init() {
   }
 
   _web.init(_circulation_motor_time_on, _circulation_motor_time_off,
-            &_motor_circulation_state, &_tds_set_point);
+            &_motor_circulation_state, &_tds_set_point,
+            &_tds_calibration_value);
 
   _disp.init();
   _disp.set_setted_tds_value(_tds_set_point);
@@ -77,6 +78,8 @@ bool TDSControlSystem::update_sensor_data() {
   _tds_set_point = _web.get_tds_set_point();
   _disp.set_setted_tds_value(_tds_set_point);
 
+  _tds_calibration_value = _web.get_tds_calibration_value();
+
   /* read sensor data */
   EventBits_t bits =
       xEventGroupWaitBits(_ISR_cb.event_group, EVENT_BIT_SENSOR_AVAILABLE,
@@ -85,12 +88,10 @@ bool TDSControlSystem::update_sensor_data() {
                           portMAX_DELAY);
 
   if (bits & EVENT_BIT_SENSOR_AVAILABLE) {
-    _current_tds_value = _tds_sensor.get_tds_value();
-    _ISR_cb.push_isr(static_cast<int>(_current_tds_value));
+    /* add the calibration in here */
+    _current_tds_value = _tds_sensor.get_tds_value() + _tds_calibration_value;
+    _ISR_cb.push(static_cast<int>(_current_tds_value));
   }
-
-  // vTaskDelay(pdMS_TO_TICKS(100)); // Update every 100 ms, so it is not
-  // sluggish
 
   return true;
 }
@@ -146,7 +147,7 @@ void IRAM_ATTR TDSControlSystem::_ISR_on_timer() {
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void TDSControlSystem::_ISR_consumer_task(void *pvParams) {
+void TDSControlSystem::display_task(void *pvParams) {
   for (;;) {
     EventBits_t bits =
         xEventGroupWaitBits(_ISR_cb.event_group, EVENT_BIT_DATA_AVAILABLE,
@@ -157,7 +158,7 @@ void TDSControlSystem::_ISR_consumer_task(void *pvParams) {
     if (bits & EVENT_BIT_DATA_AVAILABLE) {
       while (!_ISR_cb.is_empty()) {
         int val = _ISR_cb.pop();
-        Serial.printf("TDS VALUES: %d\n", val);
+        // Serial.printf("TDS VALUES: %d\n", val);
         _disp.set_current_tds_value(val);
       }
     }

@@ -7,6 +7,10 @@
  *
  * Changelog:
  *
+ * [05-10-2025]
+ * - Changed some methods name, added getter for the calibration value in apps
+ * and website objects.
+ *
  * [01-10-2025]
  * - Added and implemented circular buffer in the main apps and TDSControlSystem
  * class.
@@ -68,9 +72,7 @@ void website_task_trampoline(void *param) { tds_cs.website_task(param); }
 void circulation_motor_task_trampoline(void *param) {
   tds_cs.circulation_motor_task(param);
 }
-void ISR_consumer_task_trampoline(void *param) {
-  tds_cs._ISR_consumer_task(param);
-}
+void display_task_trampoline(void *param) { tds_cs.display_task(param); }
 
 /* === Arduino Setup === */
 void setup() {
@@ -96,8 +98,8 @@ void setup() {
                           "CirculationMotorTask", 4096, nullptr, 2, nullptr, 1);
 
   // ISR consumer task (high priority, core 1)
-  xTaskCreatePinnedToCore(ISR_consumer_task_trampoline, "ConsumerTask", 4096,
-                          nullptr, 3, nullptr, 1);
+  xTaskCreatePinnedToCore(display_task_trampoline, "DisplayTask", 4096, nullptr,
+                          3, nullptr, 1);
 }
 
 /* === Arduino Loop ===

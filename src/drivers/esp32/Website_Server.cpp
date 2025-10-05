@@ -23,15 +23,20 @@ unsigned int Website_Server::get_tds_set_point() const {
   return (_tds_set_point) ? *_tds_set_point : 0;
 }
 
+unsigned int Website_Server::get_tds_calibration_value() const {
+  return (_tds_calibration_value) ? *_tds_calibration_value : 0;
+}
+
 // Setup initializes pointers and states, sets up web endpoints
 bool Website_Server::init(unsigned int motor_circulation_time_on,
                           unsigned int motor_circulation_time_off,
-                          bool *motor_circulation_state,
-                          float *tds_set_point) {
+                          bool *motor_circulation_state, float *tds_set_point,
+                          float *tds_calibration_value) {
   _circulation_motor_state = motor_circulation_state;
   _circulation_motor_time_on = motor_circulation_time_on;
   _circulation_motor_time_off = motor_circulation_time_off;
   _tds_set_point = tds_set_point;
+  _tds_calibration_value = tds_calibration_value;
 
   // Register HTTP endpoints
   _server.on("/", HTTP_GET, [this]() { handle_root(); });
@@ -70,6 +75,9 @@ void Website_Server::handle_root() {
         Set Point (ppm): <input type="number" name="tds_set_point" value=")rawliteral" +
       String(get_tds_set_point()) + R"rawliteral("><br>
 
+        Calibration Value: <input type="number" step="0.1" name="tds_calibration_value" value=")rawliteral" +
+      String(get_tds_calibration_value()) + R"rawliteral("><br>
+
         <input type="submit" value="Update">
       </form>
 
@@ -99,6 +107,9 @@ void Website_Server::handle_set() {
   if (_server.hasArg("tds_set_point") && _tds_set_point) {
     *_tds_set_point = _server.arg("tds_set_point").toInt();
   }
+
+  if (_server.hasArg("tds_calibration_value") && _tds_calibration_value)
+    *_tds_calibration_value = _server.arg("tds_calibration_value").toFloat();
 
   _server.sendHeader("Location", "/", true);
   _server.send(302, "text/plain", "");

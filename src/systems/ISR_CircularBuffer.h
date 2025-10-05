@@ -39,7 +39,7 @@ template <typename T, size_t N> struct ISR_CircularBuffer {
   ISR_CircularBuffer() { event_group = xEventGroupCreate(); }
 
   // ISR-safe push
-  void push_isr(const T &t) {
+  void push(const T &t) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     // perform buffer update inside the critical section
